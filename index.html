@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dây Dọi Điện Tử - v1.2.0 (Firestore Connected)</title>
+    <title>Dây Dọi Điện Tử - v1.3.0 (Plumb Bob Active)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -37,6 +37,12 @@
             to { transform: translateY(0); opacity: 1; }
         }
         .toast-animate { animation: slideIn 0.3s ease-out forwards; }
+
+        /* Animation cho dây dọi mượt mà hơn */
+        #plumb-line-container {
+            transition: transform 0.1s ease-out; /* Giảm rung lắc */
+            will-change: transform;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white h-screen w-screen overflow-hidden font-sans relative">
@@ -61,6 +67,10 @@
             <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-lg bg-brand-accent/10 text-brand-accent border border-brand-accent/20">
                 <i class="fa-solid fa-camera w-5 text-center"></i><span class="font-medium">Đo đạc</span>
             </a>
+            <button onclick="requestSensorPermission()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-white/5 text-left">
+                <i class="fa-solid fa-mobile-screen-button w-5 text-center"></i>
+                <span class="font-medium">Bật Cảm biến (iOS)</span>
+            </button>
         </nav>
     </aside>
 
@@ -71,8 +81,8 @@
                 <i class="fa-solid fa-bars"></i>
             </button>
             
-            <div class="pointer-events-auto bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-2 flex flex-col gap-2 w-[140px] shadow-lg">
-                <label class="text-[10px] text-gray-400 uppercase font-bold">Độ cao vật thể</label>
+            <div class="pointer-events-auto bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-2 flex flex-col gap-2 w-[150px] shadow-lg">
+                <label class="text-[10px] text-gray-400 uppercase font-bold">Độ cao cột điện</label>
                 <div class="relative">
                     <input type="number" id="manual-height"
                         class="block w-full rounded border-none bg-black/40 px-2 py-1 text-sm text-white focus:ring-1 focus:ring-brand-accent outline-none text-right font-mono" 
@@ -91,12 +101,26 @@
             </div>
         </div>
 
-        <div class="absolute top-0 bottom-0 left-1/2 w-0.5 -ml-[1px] bg-emerald-500/30 border-l border-dashed border-emerald-500/50 z-10 pointer-events-none"></div>
+        <div class="absolute top-0 bottom-0 left-1/2 w-0.5 -ml-[1px] bg-emerald-500/50 border-l border-dashed border-emerald-300 z-10 pointer-events-none"></div>
 
-        <footer class="absolute bottom-0 left-0 right-0 z-30 p-6 pointer-events-none flex flex-col items-center gap-4 pb-8">
+        <div id="plumb-line-container" class="absolute top-0 left-1/2 h-[120%] w-0 z-20 pointer-events-none origin-top">
+            <div class="absolute top-0 left-1/2 w-[2px] h-full bg-red-600 -translate-x-1/2 shadow-[0_0_4px_rgba(255,0,0,0.8)]"></div>
+            <div class="absolute top-[70%] left-1/2 -translate-x-1/2 w-6 h-8 bg-red-600 rounded-b-full shadow-lg border border-red-400 flex items-center justify-center">
+                 <div class="w-1 h-1 bg-white rounded-full opacity-50"></div>
+            </div>
+        </div>
+
+
+        <footer class="absolute bottom-0 left-0 right-0 z-30 p-4 pointer-events-none flex items-end justify-between pb-8">
             
-            <div class="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-full px-6 py-2 text-white font-mono text-sm shadow-lg mb-2">
-                Góc nghiêng: <span id="display-angle" class="text-brand-accent font-bold">0.0°</span>
+            <div class="bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-lg min-w-[120px]">
+                <div class="text-[10px] text-gray-400 uppercase font-bold mb-1">Độ nghiêng</div>
+                <div class="flex items-baseline gap-1">
+                    <span id="display-angle" class="text-2xl text-brand-accent font-mono font-bold">0.0°</span>
+                </div>
+                <div class="text-xs text-gray-400 mt-1">
+                   Lệch: <span id="display-percent" class="text-white font-mono">0.0%</span>
+                </div>
             </div>
 
             <div class="pointer-events-auto">
@@ -105,6 +129,7 @@
                     <div id="save-spinner" class="absolute inset-0 rounded-full border-4 border-brand-accent border-t-transparent animate-spin hidden"></div>
                 </button>
             </div>
+
         </footer>
 
     </main>
@@ -113,7 +138,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // --- A. FIREBASE CONFIG ---
+        // --- FIREBASE CONFIG ---
         const firebaseConfig = {
             apiKey: "AIzaSyCzWjfcD5Dgq7V-i2izb9tKLR6QM6qWPQo",
             authDomain: "tavietnam-78ae8.firebaseapp.com",
@@ -125,93 +150,148 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // --- B. DOM ELEMENTS ---
+        // --- DOM ELEMENTS ---
         const btnCapture = document.getElementById('btn-capture');
         const inputHeight = document.getElementById('manual-height');
         const spinner = document.getElementById('save-spinner');
+        const displayAngle = document.getElementById('display-angle');
+        const displayPercent = document.getElementById('display-percent');
+        const plumbLineContainer = document.getElementById('plumb-line-container');
+        
+        let currentAngle = 0; // Lưu giá trị góc hiện tại
+
+        // --- SENSOR LOGIC (DÂY DỌI) ---
+        function handleOrientation(event) {
+            // Gamma: Nghiêng trái/phải (-90 đến 90)
+            // Beta: Nghiêng trước/sau (-180 đến 180)
+            
+            // Lấy góc nghiêng (Gamma là chính khi cầm điện thoại dọc)
+            let tilt = event.gamma; 
+            
+            // Giới hạn tilt để dây không xoay vòng vòng điên cuồng
+            if (tilt > 90) tilt = 90;
+            if (tilt < -90) tilt = -90;
+
+            currentAngle = tilt || 0;
+
+            // Xoay dây dọi ngược chiều nghiêng của điện thoại để nó luôn thẳng đứng
+            // Nếu điện thoại nghiêng phải (+), dây phải xoay trái (-)
+            if (plumbLineContainer) {
+                plumbLineContainer.style.transform = `rotate(${-currentAngle}deg)`;
+            }
+
+            // Cập nhật hiển thị số liệu
+            // Làm tròn 1 chữ số thập phân
+            const absAngle = Math.abs(currentAngle).toFixed(1);
+            displayAngle.innerText = `${absAngle}°`;
+            
+            // Tính phần trăm độ dốc (tan(angle) * 100)
+            // Chuyển độ sang radian: angle * PI / 180
+            const radians = Math.abs(currentAngle) * (Math.PI / 180);
+            const percent = Math.tan(radians) * 100;
+            displayPercent.innerText = `${percent.toFixed(1)}%`;
+            
+            // Đổi màu cảnh báo nếu nghiêng quá 5 độ
+            if (Math.abs(currentAngle) > 5) {
+                displayAngle.classList.remove('text-brand-accent');
+                displayAngle.classList.add('text-brand-danger');
+            } else {
+                displayAngle.classList.remove('text-brand-danger');
+                displayAngle.classList.add('text-brand-accent');
+            }
+        }
+
+        // Kích hoạt lắng nghe cảm biến
+        window.addEventListener('deviceorientation', handleOrientation);
+
+        // Hàm dành riêng cho iOS (Cần nút bấm để xin quyền)
+        window.requestSensorPermission = async () => {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permissionState = await DeviceOrientationEvent.requestPermission();
+                    if (permissionState === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        showToast("Đã kích hoạt cảm biến!");
+                    } else {
+                        showToast("Quyền truy cập cảm biến bị từ chối.", "error");
+                    }
+                } catch (error) {
+                    console.error(error);
+                }
+            } else {
+                showToast("Thiết bị này không cần xin quyền thủ công.");
+            }
+        };
+
+
+        // --- SAVE DATA LOGIC ---
+        btnCapture.addEventListener('click', async () => {
+            const heightVal = inputHeight.value;
+            
+            // Validation
+            if (!heightVal || heightVal <= 0) {
+                showToast('Vui lòng nhập độ cao cột điện!', 'error');
+                inputHeight.focus();
+                return;
+            }
+
+            btnCapture.disabled = true;
+            spinner.classList.remove('hidden');
+
+            try {
+                // Tính toán độ lệch đỉnh (nếu có chiều cao)
+                // Lệch (m) = tan(radian) * chiều cao
+                const radians = Math.abs(currentAngle) * (Math.PI / 180);
+                const offsetMeters = Math.tan(radians) * parseFloat(heightVal);
+
+                const recordData = {
+                    ownerId: "anonymous_user",
+                    projectId: "DEMO_PROJECT",
+                    manualHeightInput: parseFloat(heightVal),
+                    data: {
+                        angle_degree: currentAngle,
+                        slope_percent: Math.tan(radians) * 100,
+                        offset_meters: offsetMeters
+                    },
+                    location: null,
+                    imageUrl: "PENDING_UPLOAD", 
+                    deviceInfo: navigator.userAgent,
+                    capturedAt: serverTimestamp()
+                };
+
+                await addDoc(collection(db, "measurements"), recordData);
+                showToast(`Đã lưu! Lệch đỉnh: ${(offsetMeters * 100).toFixed(1)} cm`);
+                inputHeight.value = '';
+
+            } catch (e) {
+                console.error("Error: ", e);
+                showToast('Lỗi lưu: ' + e.message, 'error');
+            } finally {
+                btnCapture.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        });
+
+        // --- HELPER: TOAST ---
         const toastContainer = document.getElementById('toast-container');
         const toastMessage = document.getElementById('toast-message');
         const toastText = document.getElementById('toast-text');
 
-        // --- C. HELPER FUNCTIONS ---
-        
-        // Hàm hiển thị Toast thông báo
-        function showToast(message, type = 'success') {
+        window.showToast = function(message, type = 'success') {
             toastText.innerText = message;
             const icon = toastMessage.querySelector('i');
+            if (type === 'success') icon.className = 'fa-solid fa-check-circle text-green-500 text-xl';
+            else icon.className = 'fa-solid fa-circle-exclamation text-red-500 text-xl';
             
-            if (type === 'success') {
-                icon.className = 'fa-solid fa-check-circle text-green-500 text-xl';
-            } else {
-                icon.className = 'fa-solid fa-circle-exclamation text-red-500 text-xl';
-            }
-
             toastContainer.classList.remove('opacity-0', 'pointer-events-none');
             toastContainer.classList.add('toast-animate');
-
-            // Tự ẩn sau 3 giây
             setTimeout(() => {
                 toastContainer.classList.add('opacity-0', 'pointer-events-none');
                 toastContainer.classList.remove('toast-animate');
             }, 3000);
         }
 
-        // --- D. CORE LOGIC: SAVE TO FIRESTORE ---
-        
-        btnCapture.addEventListener('click', async () => {
-            // 1. Lấy dữ liệu Input
-            const heightVal = inputHeight.value;
-
-            // 2. Validation (Kiểm tra dữ liệu)
-            if (!heightVal || heightVal <= 0) {
-                showToast('Vui lòng nhập độ cao hợp lệ!', 'error');
-                inputHeight.focus();
-                return;
-            }
-
-            // 3. Hiệu ứng Loading
-            btnCapture.disabled = true;
-            spinner.classList.remove('hidden');
-
-            try {
-                // 4. Chuẩn bị dữ liệu (Data Object)
-                // Lưu ý: Các số liệu góc nghiêng hiện tại đang là giả lập (dummy) 
-                // vì chúng ta chưa viết code xử lý cảm biến DeviceOrientation.
-                const recordData = {
-                    ownerId: "anonymous_user", // Tạm thời hardcode, sau này lấy từ Auth
-                    projectId: "DEMO_PROJECT", // Tạm thời hardcode
-                    manualHeightInput: parseFloat(heightVal),
-                    data: {
-                        angle_degree: Math.floor(Math.random() * 5), // Giả lập dữ liệu
-                        slope_percent: Math.floor(Math.random() * 2), // Giả lập dữ liệu
-                        accuracy: 100
-                    },
-                    location: null, // Chưa xử lý GPS để code đơn giản
-                    imageUrl: "PENDING_UPLOAD", // Chưa xử lý upload ảnh
-                    deviceInfo: navigator.userAgent,
-                    capturedAt: serverTimestamp() // Dùng giờ server Firebase
-                };
-
-                // 5. Gửi lên Firestore
-                const docRef = await addDoc(collection(db, "measurements"), recordData);
-                
-                console.log("Document written with ID: ", docRef.id);
-                showToast(`Đã lưu dữ liệu! ID: ...${docRef.id.slice(-4)}`);
-                
-                // Reset input sau khi lưu
-                inputHeight.value = '';
-
-            } catch (e) {
-                console.error("Error adding document: ", e);
-                showToast('Lỗi khi lưu dữ liệu: ' + e.message, 'error');
-            } finally {
-                // 6. Tắt Loading
-                btnCapture.disabled = false;
-                spinner.classList.add('hidden');
-            }
-        });
-
-        // --- E. CAMERA LOGIC (Giữ nguyên từ version trước) ---
+        // --- CAMERA LOGIC ---
         const videoElement = document.getElementById('camera-feed');
         const loadingElement = document.getElementById('camera-loading');
         
@@ -230,7 +310,7 @@
             }
         }
         
-        window.startCamera = startCamera; // Expose global để nút Retry gọi được
+        window.startCamera = startCamera; 
         window.addEventListener('load', startCamera);
 
         // Sidebar logic
