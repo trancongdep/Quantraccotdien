@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dây Dọi Điện Tử - v1.3.0 (Plumb Bob Active)</title>
+    <title>Dây Dọi Điện Tử - v1.4.0 (Gravity Vector)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -31,17 +31,17 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         video { object-fit: cover; width: 100%; height: 100%; }
         
-        /* Hiệu ứng Toast */
         @keyframes slideIn {
             from { transform: translateY(100%); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
         .toast-animate { animation: slideIn 0.3s ease-out forwards; }
 
-        /* Animation cho dây dọi mượt mà hơn */
+        /* Tăng tốc độ phản hồi nhưng vẫn giữ độ mượt */
         #plumb-line-container {
-            transition: transform 0.1s ease-out; /* Giảm rung lắc */
             will-change: transform;
+            /* Transition ngắn để mượt, nhưng không quá dài để tránh lag */
+            transition: transform 0.1s linear; 
         }
     </style>
 </head>
@@ -103,16 +103,15 @@
 
         <div class="absolute top-0 bottom-0 left-1/2 w-0.5 -ml-[1px] bg-emerald-500/50 border-l border-dashed border-emerald-300 z-10 pointer-events-none"></div>
 
-        <div id="plumb-line-container" class="absolute top-0 left-1/2 h-[120%] w-0 z-20 pointer-events-none origin-top">
+        <div id="plumb-line-container" class="absolute top-0 left-1/2 h-[150%] w-0 z-20 pointer-events-none origin-top">
             <div class="absolute top-0 left-1/2 w-[2px] h-full bg-red-600 -translate-x-1/2 shadow-[0_0_4px_rgba(255,0,0,0.8)]"></div>
-            <div class="absolute top-[70%] left-1/2 -translate-x-1/2 w-6 h-8 bg-red-600 rounded-b-full shadow-lg border border-red-400 flex items-center justify-center">
+            <div class="absolute top-[60%] left-1/2 -translate-x-1/2 w-6 h-8 bg-red-600 rounded-b-full shadow-lg border border-red-400 flex items-center justify-center">
                  <div class="w-1 h-1 bg-white rounded-full opacity-50"></div>
             </div>
         </div>
 
 
         <footer class="absolute bottom-0 left-0 right-0 z-30 p-4 pointer-events-none flex items-end justify-between pb-8">
-            
             <div class="bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-lg min-w-[120px]">
                 <div class="text-[10px] text-gray-400 uppercase font-bold mb-1">Độ nghiêng</div>
                 <div class="flex items-baseline gap-1">
@@ -129,7 +128,6 @@
                     <div id="save-spinner" class="absolute inset-0 rounded-full border-4 border-brand-accent border-t-transparent animate-spin hidden"></div>
                 </button>
             </div>
-
         </footer>
 
     </main>
@@ -138,7 +136,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // --- FIREBASE CONFIG ---
+        // FIREBASE CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyCzWjfcD5Dgq7V-i2izb9tKLR6QM6qWPQo",
             authDomain: "tavietnam-78ae8.firebaseapp.com",
@@ -150,7 +148,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // --- DOM ELEMENTS ---
+        // DOM ELEMENTS
         const btnCapture = document.getElementById('btn-capture');
         const inputHeight = document.getElementById('manual-height');
         const spinner = document.getElementById('save-spinner');
@@ -158,68 +156,99 @@
         const displayPercent = document.getElementById('display-percent');
         const plumbLineContainer = document.getElementById('plumb-line-container');
         
-        let currentAngle = 0; // Lưu giá trị góc hiện tại
+        let currentAngle = 0; // Giá trị góc đã làm mượt
+        let rawAngle = 0;     // Giá trị góc thô
 
-        // --- SENSOR LOGIC (DÂY DỌI) ---
-        function handleOrientation(event) {
-            // Gamma: Nghiêng trái/phải (-90 đến 90)
-            // Beta: Nghiêng trước/sau (-180 đến 180)
+        // --- NEW GRAVITY LOGIC (DEVICE MOTION) ---
+        // Thay thế hoàn toàn logic DeviceOrientation cũ
+        function handleMotion(event) {
+            // Lấy gia tốc bao gồm trọng lực (x, y, z)
+            const acc = event.accelerationIncludingGravity;
             
-            // Lấy góc nghiêng (Gamma là chính khi cầm điện thoại dọc)
-            let tilt = event.gamma; 
+            if (!acc) return;
+
+            // Tính góc dựa trên vector trọng lực của trục X và Y
+            // Math.atan2(x, y) trả về góc (radian) giữa trục Y dương và điểm (x, y)
+            // Khi điện thoại đứng thẳng: x ~ 0, y ~ 9.8 (hoặc -9.8 tuỳ trình duyệt)
+            // Chúng ta dùng trục X và Y để tính góc nghiêng của máy so với phương thẳng đứng
             
-            // Giới hạn tilt để dây không xoay vòng vòng điên cuồng
-            if (tilt > 90) tilt = 90;
-            if (tilt < -90) tilt = -90;
+            // Công thức này tính góc xoay của vector trọng lực
+            const angleRadian = Math.atan2(acc.x, acc.y);
+            
+            // Chuyển sang độ
+            let angleDegree = angleRadian * (180 / Math.PI);
+            
+            // Đảo ngược dấu để phù hợp với CSS rotation
+            // Logic: Nếu máy nghiêng sang phải (x âm), góc ra âm, dây phải xoay dương để bù lại?
+            // Thực nghiệm trên web mobile: Dây cần xoay ngược chiều máy nghiêng.
+            let targetAngle = -angleDegree;
+            
+            // Hiệu chỉnh cho trường hợp cầm máy đứng (Portrait)
+            // atan2 trả về 0 khi y dương, 180 khi y âm.
+            // Khi cầm điện thoại bình thường, y thường âm (trọng lực kéo xuống dưới đáy đt).
+            // Ta cần đưa về hệ quy chiếu 0 độ là thẳng đứng.
+            
+            // Fix góc 180 độ khi cầm đứng máy (do trục Y hướng lên/xuống tuỳ device)
+            // Nếu cầm máy đứng mà thấy dây chổng ngược lên trời thì bỏ comment dòng dưới:
+            // if (targetAngle > 90) targetAngle -= 180;
+            // if (targetAngle < -90) targetAngle += 180;
+            
+            // Tuy nhiên, atan2 với (x, y) thường trả về 0 ở Landscape.
+            // Công thức chuẩn cho Portrait: atan2(x, y). 
+            // Cầm máy đứng: x=0, y=9.8 -> angle = 0.
+            // Nghiêng phải: x=-5, y=8 -> angle < 0.
+            
+            // --- LOW PASS FILTER (LÀM MƯỢT) ---
+            // Giúp dây không bị rung bần bật do tay run
+            // Hệ số alpha càng nhỏ càng mượt nhưng trễ hơn. 0.1 là vừa đẹp.
+            const alpha = 0.1;
+            currentAngle = (alpha * targetAngle) + ((1 - alpha) * currentAngle);
 
-            currentAngle = tilt || 0;
-
-            // Xoay dây dọi ngược chiều nghiêng của điện thoại để nó luôn thẳng đứng
-            // Nếu điện thoại nghiêng phải (+), dây phải xoay trái (-)
+            // Apply vào UI
             if (plumbLineContainer) {
-                plumbLineContainer.style.transform = `rotate(${-currentAngle}deg)`;
+                plumbLineContainer.style.transform = `rotate(${currentAngle}deg)`;
             }
 
-            // Cập nhật hiển thị số liệu
-            // Làm tròn 1 chữ số thập phân
-            const absAngle = Math.abs(currentAngle).toFixed(1);
-            displayAngle.innerText = `${absAngle}°`;
+            // Update số hiển thị (Trị tuyệt đối)
+            const displayVal = Math.abs(currentAngle).toFixed(1);
+            displayAngle.innerText = `${displayVal}°`;
             
-            // Tính phần trăm độ dốc (tan(angle) * 100)
-            // Chuyển độ sang radian: angle * PI / 180
+            // Percent
             const radians = Math.abs(currentAngle) * (Math.PI / 180);
             const percent = Math.tan(radians) * 100;
             displayPercent.innerText = `${percent.toFixed(1)}%`;
             
-            // Đổi màu cảnh báo nếu nghiêng quá 5 độ
-            if (Math.abs(currentAngle) > 5) {
-                displayAngle.classList.remove('text-brand-accent');
+            // Color Warning
+            if (Math.abs(currentAngle) > 2) { // Giảm ngưỡng cảnh báo xuống 2 độ
                 displayAngle.classList.add('text-brand-danger');
+                displayAngle.classList.remove('text-brand-accent');
             } else {
                 displayAngle.classList.remove('text-brand-danger');
                 displayAngle.classList.add('text-brand-accent');
             }
         }
 
-        // Kích hoạt lắng nghe cảm biến
-        window.addEventListener('deviceorientation', handleOrientation);
+        // Thay đổi Event Listener sang devicemotion
+        window.addEventListener('devicemotion', handleMotion);
 
-        // Hàm dành riêng cho iOS (Cần nút bấm để xin quyền)
+        // Hàm xin quyền (Updated cho Motion)
         window.requestSensorPermission = async () => {
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            // iOS 13+ yêu cầu quyền cho DeviceMotion
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 try {
-                    const permissionState = await DeviceOrientationEvent.requestPermission();
+                    const permissionState = await DeviceMotionEvent.requestPermission();
                     if (permissionState === 'granted') {
-                        window.addEventListener('deviceorientation', handleOrientation);
+                        window.addEventListener('devicemotion', handleMotion);
                         showToast("Đã kích hoạt cảm biến!");
                     } else {
-                        showToast("Quyền truy cập cảm biến bị từ chối.", "error");
+                        showToast("Quyền bị từ chối.", "error");
                     }
                 } catch (error) {
                     console.error(error);
+                    showToast("Lỗi xin quyền: " + error.message, "error");
                 }
             } else {
-                showToast("Thiết bị này không cần xin quyền thủ công.");
+                showToast("Thiết bị này không cần xin quyền hoặc không hỗ trợ.");
             }
         };
 
@@ -227,8 +256,6 @@
         // --- SAVE DATA LOGIC ---
         btnCapture.addEventListener('click', async () => {
             const heightVal = inputHeight.value;
-            
-            // Validation
             if (!heightVal || heightVal <= 0) {
                 showToast('Vui lòng nhập độ cao cột điện!', 'error');
                 inputHeight.focus();
@@ -239,8 +266,6 @@
             spinner.classList.remove('hidden');
 
             try {
-                // Tính toán độ lệch đỉnh (nếu có chiều cao)
-                // Lệch (m) = tan(radian) * chiều cao
                 const radians = Math.abs(currentAngle) * (Math.PI / 180);
                 const offsetMeters = Math.tan(radians) * parseFloat(heightVal);
 
@@ -313,7 +338,6 @@
         window.startCamera = startCamera; 
         window.addEventListener('load', startCamera);
 
-        // Sidebar logic
         window.toggleSidebar = function() {
             const sb = document.getElementById('sidebar');
             const bd = document.getElementById('sidebar-backdrop');
