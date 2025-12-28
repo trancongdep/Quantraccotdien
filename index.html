@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dây Dọi Điện Tử - v1.5.0 (Review Mode)</title>
+    <title>Dây Dọi Điện Tử - v1.6.0 (Author Info)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -57,20 +57,52 @@
     </div>
 
     <div id="sidebar-backdrop" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden" onclick="toggleSidebar()"></div>
-    <aside id="sidebar" class="fixed top-0 left-0 z-[60] h-full w-64 bg-slate-900/95 border-r border-white/10 shadow-2xl transform -translate-x-full transition-transform duration-300">
+    
+    <aside id="sidebar" class="fixed top-0 left-0 z-[60] h-full w-72 bg-slate-900/95 border-r border-white/10 shadow-2xl transform -translate-x-full transition-transform duration-300 flex flex-col">
+        
         <div class="p-6 border-b border-white/10 flex justify-between items-center">
             <h2 class="text-xl font-bold text-brand-accent tracking-wider uppercase">Menu</h2>
             <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-times text-xl"></i></button>
         </div>
-        <nav class="p-4 space-y-2">
+
+        <nav class="p-4 space-y-2 flex-1 overflow-y-auto no-scrollbar">
             <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-lg bg-brand-accent/10 text-brand-accent border border-brand-accent/20">
                 <i class="fa-solid fa-camera w-5 text-center"></i><span class="font-medium">Đo đạc</span>
             </a>
-            <button onclick="requestSensorPermission()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-white/5 text-left">
+            <button onclick="requestSensorPermission()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-white/5 text-left transition-colors">
                 <i class="fa-solid fa-mobile-screen-button w-5 text-center"></i>
                 <span class="font-medium">Bật Cảm biến (iOS)</span>
             </button>
         </nav>
+
+        <div class="p-5 border-t border-white/10 bg-black/20">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-full bg-brand-accent/20 flex items-center justify-center border border-brand-accent/30">
+                    <i class="fa-solid fa-user-check text-brand-accent"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-bold text-white uppercase tracking-wide">Trần Công Đẹp</p>
+                    <p class="text-[10px] text-gray-400">Tác giả & Phát triển</p>
+                </div>
+            </div>
+            
+            <div class="space-y-2 text-xs text-gray-300 pl-1">
+                <a href="https://zalo.me/0399496319" target="_blank" class="flex items-center gap-3 hover:text-brand-accent transition-colors group">
+                    <div class="w-6 h-6 rounded bg-blue-500 flex items-center justify-center text-white font-bold text-[8px]">Zalo</div>
+                    <span class="font-mono group-hover:underline">0399.496.319</span>
+                </a>
+                
+                <a href="mailto:deptc.gvatvsld@gmail.com" class="flex items-center gap-3 hover:text-brand-accent transition-colors group">
+                    <div class="w-6 h-6 rounded bg-red-500 flex items-center justify-center text-white"><i class="fa-solid fa-envelope text-[10px]"></i></div>
+                    <span class="truncate group-hover:underline">deptc.gvatvsld@gmail.com</span>
+                </a>
+            </div>
+            
+            <div class="text-[10px] text-gray-600 text-center mt-4">
+                Version 1.6.0
+            </div>
+        </div>
+
     </aside>
 
     <main class="relative h-full w-full flex flex-col bg-black">
@@ -127,7 +159,6 @@
             </div>
 
             <div class="pointer-events-auto">
-                
                 <button id="btn-capture" class="w-20 h-20 rounded-full border-4 border-white/80 bg-white/10 backdrop-blur-sm shadow-lg active:scale-90 transition-transform flex items-center justify-center group">
                     <div class="w-16 h-16 bg-white rounded-full group-hover:bg-gray-200 transition-colors"></div>
                 </button>
@@ -141,7 +172,6 @@
                         <div id="save-spinner" class="absolute inset-0 rounded-full border-4 border-white border-t-transparent animate-spin hidden"></div>
                     </button>
                 </div>
-
             </div>
         </footer>
 
@@ -183,11 +213,10 @@
 
         let currentAngle = 0; 
         let isReviewMode = false;
-        let capturedBlob = null; // Lưu ảnh dạng blob để gửi đi
 
-        // --- SENSOR LOGIC ---
+        // --- SENSOR LOGIC (Fixed v1.4.1) ---
         function handleMotion(event) {
-            if (isReviewMode) return; // Không cập nhật khi đang xem lại
+            if (isReviewMode) return; 
 
             const acc = event.accelerationIncludingGravity;
             if (!acc) return;
@@ -198,7 +227,6 @@
             const alpha = 0.1;
             currentAngle = (alpha * targetAngle) + ((1 - alpha) * currentAngle);
 
-            // Update UI
             if (plumbLineContainer) plumbLineContainer.style.transform = `rotate(${currentAngle}deg)`;
             
             const displayVal = Math.abs(currentAngle).toFixed(1);
@@ -218,52 +246,46 @@
         window.addEventListener('devicemotion', handleMotion);
 
 
-        // --- CHỨC NĂNG: CHỤP MÀN HÌNH (FREEZE) ---
+        // --- CAPTURE & REVIEW ---
         btnCapture.addEventListener('click', () => {
-            // 1. Setup Canvas
             const width = videoElement.videoWidth;
             const height = videoElement.videoHeight;
             canvasElement.width = width;
             canvasElement.height = height;
             const ctx = canvasElement.getContext('2d');
 
-            // 2. Vẽ hình ảnh từ Camera
             ctx.drawImage(videoElement, 0, 0, width, height);
 
-            // 3. Vẽ đè các thông số (Dây dọi, Text...) lên Canvas để lưu thành ảnh
-            // Lưu ý: Cần vẽ thủ công bằng code Canvas vì DOM element không tự dính vào ảnh
-            
-            // 3a. Vẽ đường tham chiếu (Xanh)
+            // Draw Guides on Canvas
             ctx.beginPath();
-            ctx.strokeStyle = '#10b981'; // Emerald 500
+            ctx.strokeStyle = '#10b981'; 
             ctx.lineWidth = 4;
-            ctx.setLineDash([10, 10]); // Nét đứt
+            ctx.setLineDash([10, 10]); 
             ctx.moveTo(width / 2, 0);
             ctx.lineTo(width / 2, height);
             ctx.stroke();
 
-            // 3b. Vẽ dây dọi (Đỏ) - Xoay theo góc nghiêng
-            ctx.save(); // Lưu trạng thái
-            ctx.translate(width / 2, 0); // Dời gốc tọa độ về giữa mép trên
-            ctx.rotate(currentAngle * Math.PI / 180); // Xoay theo radian
+            // Draw Plumb Line
+            ctx.save();
+            ctx.translate(width / 2, 0);
+            ctx.rotate(currentAngle * Math.PI / 180);
             
             ctx.beginPath();
-            ctx.strokeStyle = '#e11d48'; // Red 600
+            ctx.strokeStyle = '#e11d48'; 
             ctx.lineWidth = 5;
-            ctx.setLineDash([]); // Nét liền
+            ctx.setLineDash([]); 
             ctx.moveTo(0, 0);
-            ctx.lineTo(0, height * 1.5); // Vẽ dài quá màn hình
+            ctx.lineTo(0, height * 1.5); 
             ctx.stroke();
             
-            // Vẽ quả dọi
             ctx.fillStyle = '#e11d48';
             ctx.beginPath();
-            ctx.arc(0, height * 0.6, 20, 0, 2 * Math.PI); // Vẽ tròn giả lập quả dọi
+            ctx.arc(0, height * 0.6, 20, 0, 2 * Math.PI); 
             ctx.fill();
-            ctx.restore(); // Khôi phục trạng thái
+            ctx.restore();
 
-            // 3c. Vẽ thông số góc vào ảnh (Optional - để lưu bằng chứng)
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.7)'; // Nền đen mờ
+            // Draw Info Box
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.7)'; 
             ctx.fillRect(20, height - 150, 300, 120);
             ctx.fillStyle = 'white';
             ctx.font = 'bold 40px monospace';
@@ -271,47 +293,37 @@
             const percent = Math.tan(Math.abs(currentAngle) * Math.PI/180) * 100;
             ctx.fillText(`Lệch: ${percent.toFixed(1)}%`, 40, height - 40);
 
-            // 4. Chuyển đổi UI sang chế độ Review
+            // Toggle UI
             isReviewMode = true;
             videoElement.classList.add('hidden');
             canvasElement.classList.remove('hidden');
-            liveGuides.classList.add('hidden'); // Ẩn dây dọi DOM
-            
+            liveGuides.classList.add('hidden');
             btnCapture.classList.add('hidden');
             reviewControls.classList.remove('hidden');
-            
-            // Làm mờ các UI không cần thiết
             inputContainer.classList.add('opacity-0');
             angleDisplayBox.classList.add('opacity-0');
         });
 
-        // --- CHỨC NĂNG: HỦY BỎ ---
         btnCancel.addEventListener('click', () => {
             isReviewMode = false;
             videoElement.classList.remove('hidden');
             canvasElement.classList.add('hidden');
             liveGuides.classList.remove('hidden');
-            
             btnCapture.classList.remove('hidden');
             reviewControls.classList.add('hidden');
-            
             inputContainer.classList.remove('opacity-0');
             angleDisplayBox.classList.remove('opacity-0');
         });
 
-        // --- CHỨC NĂNG: LƯU (SAVE) ---
+        // --- SAVE ---
         btnSave.addEventListener('click', async () => {
             const heightVal = inputHeight.value;
-            
             spinner.classList.remove('hidden');
             btnSave.disabled = true;
 
             try {
-                // 1. LƯU ẢNH VÀO ALBUM (Download)
-                // Chuyển canvas thành URL ảnh
+                // Download Image
                 const imageURL = canvasElement.toDataURL("image/jpeg", 0.9);
-                
-                // Tạo thẻ a ảo để kích hoạt download
                 const link = document.createElement('a');
                 link.download = `day-doi-${Date.now()}.jpg`;
                 link.href = imageURL;
@@ -319,9 +331,9 @@
                 link.click();
                 document.body.removeChild(link);
                 
-                showToast("Đang lưu ảnh vào thiết bị...", "success");
+                showToast("Đang lưu ảnh...", "success");
 
-                // 2. LƯU DỮ LIỆU VÀO FIRESTORE
+                // Save to Firestore
                 const radians = Math.abs(currentAngle) * (Math.PI / 180);
                 const offsetMeters = heightVal ? Math.tan(radians) * parseFloat(heightVal) : 0;
 
@@ -337,10 +349,8 @@
                     capturedAt: serverTimestamp()
                 });
 
-                // Đợi 1 chút để user thấy phản hồi
                 setTimeout(() => {
-                    showToast("Đã lưu dữ liệu thành công!");
-                    // Reset về chế độ chụp
+                    showToast("Đã lưu dữ liệu!");
                     btnCancel.click(); 
                     spinner.classList.add('hidden');
                     btnSave.disabled = false;
@@ -355,8 +365,7 @@
         });
 
 
-        // --- COMMON FUNCTIONS ---
-        // (Giữ nguyên các hàm startCamera, toggleSidebar, requestSensorPermission từ version trước)
+        // --- COMMON ---
         window.requestSensorPermission = async () => {
              if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 try {
