@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dây Dọi Điện Tử - v1.4.1 (Fix Rotation)</title>
+    <title>Dây Dọi Điện Tử - v1.5.0 (Review Mode)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -19,6 +19,7 @@
                             dark: '#0f172a',
                             accent: '#f59e0b',
                             danger: '#e11d48',
+                            success: '#22c55e'
                         }
                     }
                 }
@@ -79,7 +80,7 @@
                 <i class="fa-solid fa-bars"></i>
             </button>
             
-            <div class="pointer-events-auto bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-2 flex flex-col gap-2 w-[150px] shadow-lg">
+            <div id="input-container" class="pointer-events-auto bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-xl p-2 flex flex-col gap-2 w-[150px] shadow-lg transition-opacity duration-300">
                 <label class="text-[10px] text-gray-400 uppercase font-bold">Độ cao cột điện</label>
                 <div class="relative">
                     <input type="number" id="manual-height"
@@ -92,6 +93,9 @@
 
         <div id="camera-container" class="absolute inset-0 z-0 bg-gray-900 flex items-center justify-center overflow-hidden">
             <video id="camera-feed" autoplay playsinline muted class="hidden"></video>
+            
+            <canvas id="review-canvas" class="hidden absolute inset-0 w-full h-full object-cover"></canvas>
+
             <div id="camera-loading" class="text-center p-6">
                 <div class="w-12 h-12 border-4 border-brand-accent border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                 <p class="text-sm text-gray-400">Đang khởi động Camera...</p>
@@ -99,18 +103,20 @@
             </div>
         </div>
 
-        <div class="absolute top-0 bottom-0 left-1/2 w-0.5 -ml-[1px] bg-emerald-500/50 border-l border-dashed border-emerald-300 z-10 pointer-events-none"></div>
+        <div id="live-guides" class="absolute inset-0 z-10 pointer-events-none">
+            <div class="absolute top-0 bottom-0 left-1/2 w-0.5 -ml-[1px] bg-emerald-500/50 border-l border-dashed border-emerald-300"></div>
 
-        <div id="plumb-line-container" class="absolute top-0 left-1/2 h-[150%] w-0 z-20 pointer-events-none origin-top">
-            <div class="absolute top-0 left-1/2 w-[2px] h-full bg-red-600 -translate-x-1/2 shadow-[0_0_4px_rgba(255,0,0,0.8)]"></div>
-            <div class="absolute top-[60%] left-1/2 -translate-x-1/2 w-6 h-8 bg-red-600 rounded-b-full shadow-lg border border-red-400 flex items-center justify-center">
-                 <div class="w-1 h-1 bg-white rounded-full opacity-50"></div>
+            <div id="plumb-line-container" class="absolute top-0 left-1/2 h-[150%] w-0 origin-top">
+                <div class="absolute top-0 left-1/2 w-[2px] h-full bg-red-600 -translate-x-1/2 shadow-[0_0_4px_rgba(255,0,0,0.8)]"></div>
+                <div class="absolute top-[60%] left-1/2 -translate-x-1/2 w-6 h-8 bg-red-600 rounded-b-full shadow-lg border border-red-400 flex items-center justify-center">
+                    <div class="w-1 h-1 bg-white rounded-full opacity-50"></div>
+                </div>
             </div>
         </div>
 
 
         <footer class="absolute bottom-0 left-0 right-0 z-30 p-4 pointer-events-none flex items-end justify-between pb-8">
-            <div class="bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-lg min-w-[120px]">
+            <div id="angle-display-box" class="bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-lg min-w-[120px] transition-opacity duration-300">
                 <div class="text-[10px] text-gray-400 uppercase font-bold mb-1">Độ nghiêng</div>
                 <div class="flex items-baseline gap-1">
                     <span id="display-angle" class="text-2xl text-brand-accent font-mono font-bold">0.0°</span>
@@ -121,10 +127,21 @@
             </div>
 
             <div class="pointer-events-auto">
-                <button id="btn-capture" class="w-20 h-20 rounded-full border-4 border-white/80 bg-white/10 backdrop-blur-sm shadow-lg active:scale-90 transition-transform flex items-center justify-center group relative">
+                
+                <button id="btn-capture" class="w-20 h-20 rounded-full border-4 border-white/80 bg-white/10 backdrop-blur-sm shadow-lg active:scale-90 transition-transform flex items-center justify-center group">
                     <div class="w-16 h-16 bg-white rounded-full group-hover:bg-gray-200 transition-colors"></div>
-                    <div id="save-spinner" class="absolute inset-0 rounded-full border-4 border-brand-accent border-t-transparent animate-spin hidden"></div>
                 </button>
+
+                <div id="review-controls" class="hidden flex gap-4 items-center">
+                    <button id="btn-cancel" class="w-14 h-14 rounded-full bg-gray-600 text-white shadow-lg flex items-center justify-center active:scale-90 transition-transform">
+                        <i class="fa-solid fa-trash text-xl"></i>
+                    </button>
+                    <button id="btn-save" class="w-20 h-20 rounded-full bg-brand-success text-white shadow-[0_0_20px_rgba(34,197,94,0.5)] border-4 border-white/20 flex items-center justify-center active:scale-90 transition-transform relative">
+                        <i class="fa-solid fa-floppy-disk text-3xl"></i>
+                        <div id="save-spinner" class="absolute inset-0 rounded-full border-4 border-white border-t-transparent animate-spin hidden"></div>
+                    </button>
+                </div>
+
             </div>
         </footer>
 
@@ -148,47 +165,48 @@
 
         // DOM ELEMENTS
         const btnCapture = document.getElementById('btn-capture');
+        const reviewControls = document.getElementById('review-controls');
+        const btnSave = document.getElementById('btn-save');
+        const btnCancel = document.getElementById('btn-cancel');
         const inputHeight = document.getElementById('manual-height');
         const spinner = document.getElementById('save-spinner');
+        
         const displayAngle = document.getElementById('display-angle');
         const displayPercent = document.getElementById('display-percent');
         const plumbLineContainer = document.getElementById('plumb-line-container');
         
-        let currentAngle = 0; 
+        const videoElement = document.getElementById('camera-feed');
+        const canvasElement = document.getElementById('review-canvas');
+        const liveGuides = document.getElementById('live-guides');
+        const inputContainer = document.getElementById('input-container');
+        const angleDisplayBox = document.getElementById('angle-display-box');
 
-        // --- FIXED GRAVITY LOGIC (v1.4.1) ---
+        let currentAngle = 0; 
+        let isReviewMode = false;
+        let capturedBlob = null; // Lưu ảnh dạng blob để gửi đi
+
+        // --- SENSOR LOGIC ---
         function handleMotion(event) {
+            if (isReviewMode) return; // Không cập nhật khi đang xem lại
+
             const acc = event.accelerationIncludingGravity;
             if (!acc) return;
-
-            // Tính toán góc trọng lực
-            // acc.x: + là nghiêng trái (hoặc phải tùy máy)
-            // atan2(acc.x, acc.y)
             const angleRadian = Math.atan2(acc.x, acc.y);
             const angleDegree = angleRadian * (180 / Math.PI);
-            
-            // SỬA LỖI: Đổi dấu ở đây. 
-            // Trước đây là: let targetAngle = -angleDegree;
-            // Bây giờ đổi thành:
             let targetAngle = angleDegree;
             
-            // Low pass filter làm mượt
             const alpha = 0.1;
             currentAngle = (alpha * targetAngle) + ((1 - alpha) * currentAngle);
 
-            // Apply
-            if (plumbLineContainer) {
-                plumbLineContainer.style.transform = `rotate(${currentAngle}deg)`;
-            }
-
             // Update UI
+            if (plumbLineContainer) plumbLineContainer.style.transform = `rotate(${currentAngle}deg)`;
+            
             const displayVal = Math.abs(currentAngle).toFixed(1);
             displayAngle.innerText = `${displayVal}°`;
-            
             const radians = Math.abs(currentAngle) * (Math.PI / 180);
             const percent = Math.tan(radians) * 100;
             displayPercent.innerText = `${percent.toFixed(1)}%`;
-            
+
             if (Math.abs(currentAngle) > 2) {
                 displayAngle.classList.add('text-brand-danger');
                 displayAngle.classList.remove('text-brand-accent');
@@ -197,84 +215,164 @@
                 displayAngle.classList.add('text-brand-accent');
             }
         }
-
         window.addEventListener('devicemotion', handleMotion);
 
-        // Hàm xin quyền
-        window.requestSensorPermission = async () => {
-            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                try {
-                    const permissionState = await DeviceMotionEvent.requestPermission();
-                    if (permissionState === 'granted') {
-                        window.addEventListener('devicemotion', handleMotion);
-                        showToast("Đã kích hoạt cảm biến!");
-                    } else {
-                        showToast("Quyền bị từ chối.", "error");
-                    }
-                } catch (error) {
-                    console.error(error);
-                    showToast("Lỗi xin quyền: " + error.message, "error");
-                }
-            } else {
-                showToast("Thiết bị này không cần xin quyền.");
-            }
-        };
 
-        // --- SAVE DATA LOGIC ---
-        btnCapture.addEventListener('click', async () => {
+        // --- CHỨC NĂNG: CHỤP MÀN HÌNH (FREEZE) ---
+        btnCapture.addEventListener('click', () => {
+            // 1. Setup Canvas
+            const width = videoElement.videoWidth;
+            const height = videoElement.videoHeight;
+            canvasElement.width = width;
+            canvasElement.height = height;
+            const ctx = canvasElement.getContext('2d');
+
+            // 2. Vẽ hình ảnh từ Camera
+            ctx.drawImage(videoElement, 0, 0, width, height);
+
+            // 3. Vẽ đè các thông số (Dây dọi, Text...) lên Canvas để lưu thành ảnh
+            // Lưu ý: Cần vẽ thủ công bằng code Canvas vì DOM element không tự dính vào ảnh
+            
+            // 3a. Vẽ đường tham chiếu (Xanh)
+            ctx.beginPath();
+            ctx.strokeStyle = '#10b981'; // Emerald 500
+            ctx.lineWidth = 4;
+            ctx.setLineDash([10, 10]); // Nét đứt
+            ctx.moveTo(width / 2, 0);
+            ctx.lineTo(width / 2, height);
+            ctx.stroke();
+
+            // 3b. Vẽ dây dọi (Đỏ) - Xoay theo góc nghiêng
+            ctx.save(); // Lưu trạng thái
+            ctx.translate(width / 2, 0); // Dời gốc tọa độ về giữa mép trên
+            ctx.rotate(currentAngle * Math.PI / 180); // Xoay theo radian
+            
+            ctx.beginPath();
+            ctx.strokeStyle = '#e11d48'; // Red 600
+            ctx.lineWidth = 5;
+            ctx.setLineDash([]); // Nét liền
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, height * 1.5); // Vẽ dài quá màn hình
+            ctx.stroke();
+            
+            // Vẽ quả dọi
+            ctx.fillStyle = '#e11d48';
+            ctx.beginPath();
+            ctx.arc(0, height * 0.6, 20, 0, 2 * Math.PI); // Vẽ tròn giả lập quả dọi
+            ctx.fill();
+            ctx.restore(); // Khôi phục trạng thái
+
+            // 3c. Vẽ thông số góc vào ảnh (Optional - để lưu bằng chứng)
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.7)'; // Nền đen mờ
+            ctx.fillRect(20, height - 150, 300, 120);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 40px monospace';
+            ctx.fillText(`Góc: ${Math.abs(currentAngle).toFixed(1)}°`, 40, height - 90);
+            const percent = Math.tan(Math.abs(currentAngle) * Math.PI/180) * 100;
+            ctx.fillText(`Lệch: ${percent.toFixed(1)}%`, 40, height - 40);
+
+            // 4. Chuyển đổi UI sang chế độ Review
+            isReviewMode = true;
+            videoElement.classList.add('hidden');
+            canvasElement.classList.remove('hidden');
+            liveGuides.classList.add('hidden'); // Ẩn dây dọi DOM
+            
+            btnCapture.classList.add('hidden');
+            reviewControls.classList.remove('hidden');
+            
+            // Làm mờ các UI không cần thiết
+            inputContainer.classList.add('opacity-0');
+            angleDisplayBox.classList.add('opacity-0');
+        });
+
+        // --- CHỨC NĂNG: HỦY BỎ ---
+        btnCancel.addEventListener('click', () => {
+            isReviewMode = false;
+            videoElement.classList.remove('hidden');
+            canvasElement.classList.add('hidden');
+            liveGuides.classList.remove('hidden');
+            
+            btnCapture.classList.remove('hidden');
+            reviewControls.classList.add('hidden');
+            
+            inputContainer.classList.remove('opacity-0');
+            angleDisplayBox.classList.remove('opacity-0');
+        });
+
+        // --- CHỨC NĂNG: LƯU (SAVE) ---
+        btnSave.addEventListener('click', async () => {
             const heightVal = inputHeight.value;
-            if (!heightVal || heightVal <= 0) {
-                showToast('Vui lòng nhập độ cao cột điện!', 'error');
-                inputHeight.focus();
-                return;
-            }
-
-            btnCapture.disabled = true;
+            
             spinner.classList.remove('hidden');
+            btnSave.disabled = true;
 
             try {
-                const radians = Math.abs(currentAngle) * (Math.PI / 180);
-                const offsetMeters = Math.tan(radians) * parseFloat(heightVal);
+                // 1. LƯU ẢNH VÀO ALBUM (Download)
+                // Chuyển canvas thành URL ảnh
+                const imageURL = canvasElement.toDataURL("image/jpeg", 0.9);
+                
+                // Tạo thẻ a ảo để kích hoạt download
+                const link = document.createElement('a');
+                link.download = `day-doi-${Date.now()}.jpg`;
+                link.href = imageURL;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showToast("Đang lưu ảnh vào thiết bị...", "success");
 
-                const recordData = {
+                // 2. LƯU DỮ LIỆU VÀO FIRESTORE
+                const radians = Math.abs(currentAngle) * (Math.PI / 180);
+                const offsetMeters = heightVal ? Math.tan(radians) * parseFloat(heightVal) : 0;
+
+                await addDoc(collection(db, "measurements"), {
                     ownerId: "anonymous_user",
-                    projectId: "DEMO_PROJECT",
-                    manualHeightInput: parseFloat(heightVal),
+                    manualHeightInput: parseFloat(heightVal) || 0,
                     data: {
                         angle_degree: currentAngle,
                         slope_percent: Math.tan(radians) * 100,
                         offset_meters: offsetMeters
                     },
-                    location: null,
-                    imageUrl: "PENDING_UPLOAD", 
                     deviceInfo: navigator.userAgent,
                     capturedAt: serverTimestamp()
-                };
+                });
 
-                await addDoc(collection(db, "measurements"), recordData);
-                showToast(`Đã lưu! Lệch đỉnh: ${(offsetMeters * 100).toFixed(1)} cm`);
-                inputHeight.value = '';
+                // Đợi 1 chút để user thấy phản hồi
+                setTimeout(() => {
+                    showToast("Đã lưu dữ liệu thành công!");
+                    // Reset về chế độ chụp
+                    btnCancel.click(); 
+                    spinner.classList.add('hidden');
+                    btnSave.disabled = false;
+                }, 1500);
 
             } catch (e) {
-                console.error("Error: ", e);
-                showToast('Lỗi lưu: ' + e.message, 'error');
-            } finally {
-                btnCapture.disabled = false;
+                console.error(e);
+                showToast("Lỗi: " + e.message, "error");
                 spinner.classList.add('hidden');
+                btnSave.disabled = false;
             }
         });
 
-        // --- HELPER: TOAST ---
-        const toastContainer = document.getElementById('toast-container');
-        const toastMessage = document.getElementById('toast-message');
-        const toastText = document.getElementById('toast-text');
 
+        // --- COMMON FUNCTIONS ---
+        // (Giữ nguyên các hàm startCamera, toggleSidebar, requestSensorPermission từ version trước)
+        window.requestSensorPermission = async () => {
+             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const permissionState = await DeviceMotionEvent.requestPermission();
+                    if (permissionState === 'granted') {
+                        window.addEventListener('devicemotion', handleMotion);
+                        showToast("Đã kích hoạt cảm biến!");
+                    }
+                } catch (error) { showToast("Lỗi xin quyền: " + error.message, "error"); }
+            } else { showToast("Thiết bị này không cần xin quyền."); }
+        };
+
+        const toastContainer = document.getElementById('toast-container');
+        const toastText = document.getElementById('toast-text');
         window.showToast = function(message, type = 'success') {
             toastText.innerText = message;
-            const icon = toastMessage.querySelector('i');
-            if (type === 'success') icon.className = 'fa-solid fa-check-circle text-green-500 text-xl';
-            else icon.className = 'fa-solid fa-circle-exclamation text-red-500 text-xl';
-            
             toastContainer.classList.remove('opacity-0', 'pointer-events-none');
             toastContainer.classList.add('toast-animate');
             setTimeout(() => {
@@ -283,10 +381,6 @@
             }, 3000);
         }
 
-        // --- CAMERA LOGIC ---
-        const videoElement = document.getElementById('camera-feed');
-        const loadingElement = document.getElementById('camera-loading');
-        
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -294,17 +388,15 @@
                 });
                 videoElement.srcObject = stream;
                 videoElement.onloadedmetadata = () => {
-                    loadingElement.classList.add('hidden');
+                    document.getElementById('camera-loading').classList.add('hidden');
                     videoElement.classList.remove('hidden');
                 };
             } catch (err) {
-                loadingElement.querySelector('p').innerText = "Lỗi Camera: " + err.message;
+                document.getElementById('camera-loading').querySelector('p').innerText = "Lỗi Camera: " + err.message;
             }
         }
-        
         window.startCamera = startCamera; 
         window.addEventListener('load', startCamera);
-
         window.toggleSidebar = function() {
             const sb = document.getElementById('sidebar');
             const bd = document.getElementById('sidebar-backdrop');
