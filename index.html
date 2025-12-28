@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dây Dọi Điện Tử - v1.4.0 (Gravity Vector)</title>
+    <title>Dây Dọi Điện Tử - v1.4.1 (Fix Rotation)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -37,10 +37,8 @@
         }
         .toast-animate { animation: slideIn 0.3s ease-out forwards; }
 
-        /* Tăng tốc độ phản hồi nhưng vẫn giữ độ mượt */
         #plumb-line-container {
             will-change: transform;
-            /* Transition ngắn để mượt, nhưng không quá dài để tránh lag */
             transition: transform 0.1s linear; 
         }
     </style>
@@ -156,70 +154,42 @@
         const displayPercent = document.getElementById('display-percent');
         const plumbLineContainer = document.getElementById('plumb-line-container');
         
-        let currentAngle = 0; // Giá trị góc đã làm mượt
-        let rawAngle = 0;     // Giá trị góc thô
+        let currentAngle = 0; 
 
-        // --- NEW GRAVITY LOGIC (DEVICE MOTION) ---
-        // Thay thế hoàn toàn logic DeviceOrientation cũ
+        // --- FIXED GRAVITY LOGIC (v1.4.1) ---
         function handleMotion(event) {
-            // Lấy gia tốc bao gồm trọng lực (x, y, z)
             const acc = event.accelerationIncludingGravity;
-            
             if (!acc) return;
 
-            // Tính góc dựa trên vector trọng lực của trục X và Y
-            // Math.atan2(x, y) trả về góc (radian) giữa trục Y dương và điểm (x, y)
-            // Khi điện thoại đứng thẳng: x ~ 0, y ~ 9.8 (hoặc -9.8 tuỳ trình duyệt)
-            // Chúng ta dùng trục X và Y để tính góc nghiêng của máy so với phương thẳng đứng
-            
-            // Công thức này tính góc xoay của vector trọng lực
+            // Tính toán góc trọng lực
+            // acc.x: + là nghiêng trái (hoặc phải tùy máy)
+            // atan2(acc.x, acc.y)
             const angleRadian = Math.atan2(acc.x, acc.y);
+            const angleDegree = angleRadian * (180 / Math.PI);
             
-            // Chuyển sang độ
-            let angleDegree = angleRadian * (180 / Math.PI);
+            // SỬA LỖI: Đổi dấu ở đây. 
+            // Trước đây là: let targetAngle = -angleDegree;
+            // Bây giờ đổi thành:
+            let targetAngle = angleDegree;
             
-            // Đảo ngược dấu để phù hợp với CSS rotation
-            // Logic: Nếu máy nghiêng sang phải (x âm), góc ra âm, dây phải xoay dương để bù lại?
-            // Thực nghiệm trên web mobile: Dây cần xoay ngược chiều máy nghiêng.
-            let targetAngle = -angleDegree;
-            
-            // Hiệu chỉnh cho trường hợp cầm máy đứng (Portrait)
-            // atan2 trả về 0 khi y dương, 180 khi y âm.
-            // Khi cầm điện thoại bình thường, y thường âm (trọng lực kéo xuống dưới đáy đt).
-            // Ta cần đưa về hệ quy chiếu 0 độ là thẳng đứng.
-            
-            // Fix góc 180 độ khi cầm đứng máy (do trục Y hướng lên/xuống tuỳ device)
-            // Nếu cầm máy đứng mà thấy dây chổng ngược lên trời thì bỏ comment dòng dưới:
-            // if (targetAngle > 90) targetAngle -= 180;
-            // if (targetAngle < -90) targetAngle += 180;
-            
-            // Tuy nhiên, atan2 với (x, y) thường trả về 0 ở Landscape.
-            // Công thức chuẩn cho Portrait: atan2(x, y). 
-            // Cầm máy đứng: x=0, y=9.8 -> angle = 0.
-            // Nghiêng phải: x=-5, y=8 -> angle < 0.
-            
-            // --- LOW PASS FILTER (LÀM MƯỢT) ---
-            // Giúp dây không bị rung bần bật do tay run
-            // Hệ số alpha càng nhỏ càng mượt nhưng trễ hơn. 0.1 là vừa đẹp.
+            // Low pass filter làm mượt
             const alpha = 0.1;
             currentAngle = (alpha * targetAngle) + ((1 - alpha) * currentAngle);
 
-            // Apply vào UI
+            // Apply
             if (plumbLineContainer) {
                 plumbLineContainer.style.transform = `rotate(${currentAngle}deg)`;
             }
 
-            // Update số hiển thị (Trị tuyệt đối)
+            // Update UI
             const displayVal = Math.abs(currentAngle).toFixed(1);
             displayAngle.innerText = `${displayVal}°`;
             
-            // Percent
             const radians = Math.abs(currentAngle) * (Math.PI / 180);
             const percent = Math.tan(radians) * 100;
             displayPercent.innerText = `${percent.toFixed(1)}%`;
             
-            // Color Warning
-            if (Math.abs(currentAngle) > 2) { // Giảm ngưỡng cảnh báo xuống 2 độ
+            if (Math.abs(currentAngle) > 2) {
                 displayAngle.classList.add('text-brand-danger');
                 displayAngle.classList.remove('text-brand-accent');
             } else {
@@ -228,12 +198,10 @@
             }
         }
 
-        // Thay đổi Event Listener sang devicemotion
         window.addEventListener('devicemotion', handleMotion);
 
-        // Hàm xin quyền (Updated cho Motion)
+        // Hàm xin quyền
         window.requestSensorPermission = async () => {
-            // iOS 13+ yêu cầu quyền cho DeviceMotion
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 try {
                     const permissionState = await DeviceMotionEvent.requestPermission();
@@ -248,10 +216,9 @@
                     showToast("Lỗi xin quyền: " + error.message, "error");
                 }
             } else {
-                showToast("Thiết bị này không cần xin quyền hoặc không hỗ trợ.");
+                showToast("Thiết bị này không cần xin quyền.");
             }
         };
-
 
         // --- SAVE DATA LOGIC ---
         btnCapture.addEventListener('click', async () => {
